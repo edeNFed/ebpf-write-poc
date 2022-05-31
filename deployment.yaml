@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ebpf-write-poc
+  name: ebpf-write-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ebpf-write-poc
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: ebpf-write-poc
+    spec:
+      shareProcessNamespace: true
+      volumes:
+        - name: kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+      containers:
+        - name: poc-instrumentation
+          image: keyval/otel-go-agent:v0.5.33
+          env:
+            - name: OTEL_TARGET_EXE
+              value: /app
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "jaeger:4317"
+            - name: OTEL_SERVICE_NAME
+              value: "poc"
+          securityContext:
+            runAsUser: 0
+            capabilities:
+              add:
+                - SYS_PTRACE
+            privileged: true
+          volumeMounts:
+            - mountPath: /sys/kernel/debug
+              name: kernel-debug
+        - image: eden/ebpf-write-poc
+          imagePullPolicy: IfNotPresent
+          name: ebpf-write-poc
